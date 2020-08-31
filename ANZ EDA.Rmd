@@ -1,0 +1,154 @@
+---
+title: "ANZ Virtual Internship EDA"
+author: "Gunay Mammadsalahova"
+date: "8/20/2020"
+output: html_document
+---
+
+The dataset contains 12043 transactions for 100 customers who have one bank account each.Trasactional period is from 01/08/2018 - 31/10/2018 (92 days duration).
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+## EXPLORATORY DATA ANALYSIS
+
+
+```{r}
+anz <- read.csv("anz.csv", na.strings = c("NA",""))
+dim(anz)
+```
+Data have 12043 rows and 23 columns.
+```{r}
+#columns
+colnames(anz)
+```
+
+```{r}
+library(tidyverse)
+glimpse(anz)
+```
+
+```{r}
+#Columns with missing values
+colSums(is.na(anz))
+```
+```{r}
+#delete columns with 92% NA's
+anz <- anz[,-c(3,9)]
+```
+So, we deleted `bpay_biller_code` and `merchant_code` columns.
+```{r}
+library(Amelia)
+missmap(anz, col = c("black","grey"))
+```
+As we see, missing values in columns overlap.
+```{r}
+#Average transaction amount
+mean(anz$amount) # 187.9336
+```
+So, the average of the `amount` is `r mean(anz$amount)`.
+
+```{r}
+#gender 
+library(ggplot2)
+ggplot(anz, aes(x = gender))+
+  geom_bar(fill = "purple") +
+  labs(x = "Gender", y = "Transaction count",
+       title = "Transaction counts for each gender")
+```
+```{r echo=FALSE}
+table(anz$gender)
+```
+
+```{r echo=FALSE}
+#movement
+ggplot(anz, aes(x = movement))+
+  geom_bar(fill = "light blue") +
+  labs(x = "Transaction Movement", y = "Number of Transactions",
+       title = "Transaction Movement")
+```
+```{r}
+table(anz$movement)
+```
+```{r echo=FALSE}
+#description
+ggplot(anz, aes(x = txn_description))+
+  geom_bar(fill = "yellow") +
+  labs(x = "Description", y = "Number of Transactions",
+       title = "Transaction description")
+```
+
+```{r echo=FALSE}
+table(anz$txn_description)
+```
+```{r echo=FALSE}
+#merchant state
+ggplot(anz, aes(x = merchant_state))+
+  geom_bar(fill = "blue")+
+  labs(x = "Merchant state",y = "Number of Transactions",
+       title = "Transactions in each merchant state")
+```
+```{r echo=FALSE}
+table(anz$merchant_state)
+```
+
+```{r echo=FALSE}
+##historgram of total amount transacted
+mean_trans<-anz %>%
+  group_by(customer_id) %>%
+  summarise(average_trans=n()/3)
+
+ggplot(mean_trans,aes(average_trans))+geom_histogram(bins = 20, fill = "salmon")+
+  labs(x="Monthly Average Transactions",y="Number of Customers",title="Monthly Average Transactions")
+```
+Maximum transaction amount is around 200 AUD
+```{r}
+#changing date column's format
+anz$date<-as.Date(anz$date,format = "%m/%d/%Y")
+##extracting weekday of transaction
+anz$weekday<-weekdays(anz$date)
+```
+
+```{r}
+library(lubridate)
+#extracting time of transaction
+anz$hour<-hour(as.POSIXct(substr(anz$extraction,12,19),format="%H:%M:%S"))
+```
+
+```{r echo=TRUE}
+#Mean of spending during one week
+mean_spending_aug_week<- anz %>% filter(movement=="debit")%>%filter(date >="2018-08-06" & date<="2018-08-12") %>% group_by(date) %>% summarise(mean_spending=mean(amount))
+ggplot(mean_spending_aug_week,aes(x=date,y=mean_spending))+geom_line() +
+  labs(x = "Date", y = "Mean of spending $", title = "Mean of spending during one week")
+```
+So,here the maximum average of spending is occured in Tuesday, the least in Friday.
+
+```{r echo=TRUE}
+#Average volume of transactions during one week
+mean_volume_aug_week<- anz %>%filter(date >="2018-08-06" & date<="2018-08-12") %>% group_by(date) %>% summarise(average_volume=n())
+ggplot(mean_volume_aug_week,aes(x=date,y=average_volume))+geom_line() + 
+  labs(x = "Date", y = "Average volume",title = "Average volume of transactions during one week")
+
+```
+The least average volume of transactions happened in Monday, the most in Friday.
+
+```{r  echo=TRUE}
+## Visualise transaction volume over an average week.
+atw <- anz %>% select(date, weekday) %>% group_by(date, weekday) %>%
+  summarise(daily_avg_vol = n()) %>% group_by(weekday) %>%
+  summarise(avg_vol=mean(daily_avg_vol, na.rm = TRUE))
+atw$weekday <- factor(atw$weekday, levels = c("Monday","Tuesday","Wednesday",
+                                              "Thursday","Friday","Saturday","Sunday"))
+ggplot(atw, aes(x = weekday, y = avg_vol)) + geom_point() + geom_line(aes(group = 1))+
+  ggtitle('Average transaction volume by weekday')+
+  labs(x ='Weekday',y='Transaction volume')
+
+```
+```{r echo=TRUE}
+# visualize transaction volume over an average week.
+ath <- anz %>% select(date,hour) %>%  group_by(date,hour) %>% summarize(trans_vol=n()) %>%   group_by(hour) %>% summarize(trans_vol_per_hr = mean(trans_vol,na.rm=TRUE))
+ggplot(ath,aes(x=hour,y=trans_vol_per_hr))+geom_point()+geom_line(aes(group = 1))+  ggtitle('Average transaction volume by hour') +  labs(x='Hour',y='Transaction volume') + expand_limits( y = 0)
+
+```
+
